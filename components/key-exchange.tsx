@@ -25,25 +25,33 @@ export default function KeyExchange() {
     try {
       setError("")
 
-      // For demonstration purposes, we'll generate mock keys
-      // In a real app, you would use crypto.subtle.generateKey
-
       if (algorithm === "DH") {
         // Simulate Diffie-Hellman parameters
         const p = 23 // A small prime for demonstration
         const g = 5 // A generator for the group
 
+        // Helper function for modular exponentiation
+        const modPow = (base, exponent, modulus) => {
+          if (modulus === 1) return 0
+          let result = 1
+          base = base % modulus
+          while (exponent > 0) {
+            if (exponent % 2 === 1) {
+              result = (result * base) % modulus
+            }
+            exponent = Math.floor(exponent / 2)
+            base = (base * base) % modulus
+          }
+          return result
+        }
+
         // Generate private keys (random numbers)
         const alicePrivateKey = Math.floor(Math.random() * (p - 2)) + 2
         const bobPrivateKey = Math.floor(Math.random() * (p - 2)) + 2
 
-        // Calculate public keys: g^private mod p
-        const alicePublicKey = Math.pow(g, alicePrivateKey) % p
-        const bobPublicKey = Math.pow(g, bobPrivateKey) % p
-
-        // Calculate shared secrets: (other's public)^myPrivate mod p
-        const aliceSharedSecret = Math.pow(bobPublicKey, alicePrivateKey) % p
-        const bobSharedSecret = Math.pow(alicePublicKey, bobPrivateKey) % p
+        // Calculate public keys using proper modular exponentiation
+        const alicePublicKey = modPow(g, alicePrivateKey, p)
+        const bobPublicKey = modPow(g, bobPrivateKey, p)
 
         setAlicePrivate(alicePrivateKey.toString())
         setAlicePublic(alicePublicKey.toString())
@@ -82,9 +90,29 @@ export default function KeyExchange() {
         const bobPrivateKey = Number.parseInt(bobPrivate)
         const alicePublicKey = Number.parseInt(alicePublic)
 
-        // Calculate shared secrets
-        const aliceSharedSecret = Math.pow(bobPublicKey, alicePrivateKey) % p
-        const bobSharedSecret = Math.pow(alicePublicKey, bobPrivateKey) % p
+        // Validate inputs
+        if (isNaN(alicePrivateKey) || isNaN(bobPublicKey) || isNaN(bobPrivateKey) || isNaN(alicePublicKey)) {
+          throw new Error("Invalid key values")
+        }
+
+        // Helper function for modular exponentiation
+        const modPow = (base, exponent, modulus) => {
+          if (modulus === 1) return 0
+          let result = 1
+          base = base % modulus
+          while (exponent > 0) {
+            if (exponent % 2 === 1) {
+              result = (result * base) % modulus
+            }
+            exponent = Math.floor(exponent / 2)
+            base = (base * base) % modulus
+          }
+          return result
+        }
+
+        // Calculate shared secrets using proper modular exponentiation
+        const aliceSharedSecret = modPow(bobPublicKey, alicePrivateKey, p)
+        const bobSharedSecret = modPow(alicePublicKey, bobPrivateKey, p)
 
         setAliceShared(aliceSharedSecret.toString())
         setBobShared(bobSharedSecret.toString())
