@@ -71,7 +71,7 @@ rBKT+9m83Hh1d5nIQtQQXnBL
       setPublicKey(mockPublicKey)
       setPrivateKey(mockPrivateKey)
     } catch (err) {
-      setError(`Key generation error: ${err.message}`)
+      setError(`Key generation error: ${err instanceof Error ? err.message : "Unknown error"}`)
       console.error(err)
     }
   }
@@ -87,7 +87,7 @@ rBKT+9m83Hh1d5nIQtQQXnBL
       const mockEncrypted = btoa(plaintext)
       setCiphertext(mockEncrypted)
     } catch (err) {
-      setError(`Encryption error: ${err.message}`)
+      setError(`Encryption error: ${err instanceof Error ? err.message : "Unknown error"}`)
       console.error(err)
     }
   }
@@ -103,7 +103,7 @@ rBKT+9m83Hh1d5nIQtQQXnBL
       const mockDecrypted = atob(ciphertext)
       setDecryptedText(mockDecrypted)
     } catch (err) {
-      setError(`Decryption error: ${err.message}`)
+      setError(`Decryption error: ${err instanceof Error ? err.message : "Unknown error"}`)
       console.error(err)
     }
   }
@@ -224,41 +224,48 @@ rBKT+9m83Hh1d5nIQtQQXnBL
 
       <Card>
         <CardHeader>
-          <CardTitle>Asymmetric Encryption Cheatsheet</CardTitle>
+          <CardTitle>RSA Mathematical Foundation</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4">
-            <div>
-              <h3 className="text-lg font-medium">RSA (Rivest–Shamir–Adleman)</h3>
-              <p className="text-muted-foreground">
-                An asymmetric encryption algorithm that uses a pair of keys: a public key for encryption and a private
-                key for decryption.
-              </p>
+            <div className="bg-blue-50 p-4 rounded-md">
+              <h4 className="font-semibold text-blue-800">RSA Key Generation</h4>
+              <div className="text-sm text-blue-700 mt-2 space-y-2">
+                <div className="font-mono">1. Choose two large primes: p, q</div>
+                <div className="font-mono">2. Compute modulus: N = p × q</div>
+                <div className="font-mono">3. Compute Euler's totient: φ(N) = (p-1)(q-1)</div>
+                <div className="font-mono">4. Choose public exponent: e (commonly 65537)</div>
+                <div className="font-mono">5. Compute private exponent: d ≡ e⁻¹ (mod φ(N))</div>
+                <div className="text-xs mt-2 bg-blue-100 p-2 rounded">
+                  <strong>Key insight:</strong> d is the modular multiplicative inverse of e modulo φ(N). This means e ×
+                  d ≡ 1 (mod φ(N)). Finding d is easy if you know the prime factorization of N (i.e., p and q), but
+                  computationally infeasible without it. This is the foundation of RSA security - the difficulty of
+                  factoring large composite numbers.
+                </div>
+                <div className="text-xs mt-2">Public key: (N, e) | Private key: (N, d)</div>
+              </div>
             </div>
 
-            <div>
-              <h3 className="text-lg font-medium">Key Concepts</h3>
-              <ul className="list-disc pl-5 space-y-2 mt-2">
-                <li>
-                  <span className="font-medium">Public Key:</span> Shared openly and used to encrypt data. Cannot be
-                  used to decrypt.
-                </li>
-                <li>
-                  <span className="font-medium">Private Key:</span> Kept secret and used to decrypt data that was
-                  encrypted with the corresponding public key.
-                </li>
-                <li>
-                  <span className="font-medium">Key Size:</span> Determines the security level. Common sizes are 2048
-                  and 4096 bits.
-                </li>
-                <li>
-                  <span className="font-medium">Padding Schemes:</span>
-                  <ul className="list-disc pl-5 mt-1">
-                    <li>PKCS#1 v1.5: Older padding scheme, less secure for some applications</li>
-                    <li>OAEP (Optimal Asymmetric Encryption Padding): Modern, more secure padding scheme</li>
-                  </ul>
-                </li>
-              </ul>
+            <div className="bg-green-50 p-4 rounded-md">
+              <h4 className="font-semibold text-green-800">Encryption</h4>
+              <div className="text-sm text-green-700 mt-2 space-y-2">
+                <div className="font-mono">1. Obtain the recipient's public key (N, e).</div>
+                <div className="font-mono">2. Represent the message as an integer m, such that 0 ≤ m {"<"} N.</div>
+                <div className="font-mono">
+                  3. Compute the ciphertext: c = m<sup>e</sup> mod N
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-red-50 p-4 rounded-md">
+              <h4 className="font-semibold text-red-800">Decryption</h4>
+              <div className="text-sm text-red-700 mt-2 space-y-2">
+                <div className="font-mono">1. Use the recipient's private key (N, d) to compute:</div>
+                <div className="font-mono">
+                  2. m = c<sup>d</sup> mod N
+                </div>
+                <div className="font-mono">3. The result, m, is the original message.</div>
+              </div>
             </div>
 
             <div>

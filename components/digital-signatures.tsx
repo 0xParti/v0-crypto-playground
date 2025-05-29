@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { CheckIcon, KeyIcon, PenIcon, ShieldCheckIcon, XIcon } from "lucide-react"
+import { CheckIcon, KeyIcon, PenIcon, ShieldCheckIcon, XIcon, Calculator, ArrowRight } from "lucide-react"
 import SignatureVisualization from "./visualizations/signature-visualization"
 
 export default function DigitalSignatures() {
@@ -21,6 +21,20 @@ export default function DigitalSignatures() {
   const [verificationResult, setVerificationResult] = useState<boolean | null>(null)
   const [error, setError] = useState("")
   const [tamperedMessage, setTamperedMessage] = useState("")
+
+  // DSA specific state
+  const [dsaStep, setDsaStep] = useState(0)
+  const [dsaParams, setDsaParams] = useState({
+    p: 23, // prime
+    q: 11, // prime divisor of p-1
+    g: 2, // generator
+    x: 5, // private key
+    y: 0, // public key (g^x mod p)
+    k: 3, // random nonce
+    r: 0, // signature component
+    s: 0, // signature component
+    hash: 0, // hash of message
+  })
 
   const generateKeyPair = async () => {
     try {
@@ -85,11 +99,26 @@ JMZzxdJYjT6wNmR8xKEbQJKKRUUmq3936WNu7ZY1WUbL2y9MCbZ6UVgA
       } else if (algorithm === "Ed25519") {
         mockPublicKey = `302a300506032b6570032100d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a`
         mockPrivateKey = `302e020100300506032b6570042204206b9295efc3ea32b8ca71dbe4213f7f3886eba6af76ab7d67af7262e8c4d1e0d1`
+      } else if (algorithm === "DSA") {
+        // Generate DSA parameters
+        const newParams = { ...dsaParams }
+        newParams.y = modPow(newParams.g, newParams.x, newParams.p)
+        setDsaParams(newParams)
+
+        mockPublicKey = `DSA Public Key:
+p = ${newParams.p} (prime)
+q = ${newParams.q} (prime divisor of p-1)  
+g = ${newParams.g} (generator)
+y = ${newParams.y} (g^x mod p)`
+
+        mockPrivateKey = `DSA Private Key:
+x = ${newParams.x} (private key)`
       }
 
       setPublicKey(mockPublicKey)
       setPrivateKey(mockPrivateKey)
       setVerificationResult(null)
+      setDsaStep(0)
     } catch (err) {
       setError(`Key generation error: ${err.message}`)
       console.error(err)
@@ -100,12 +129,29 @@ JMZzxdJYjT6wNmR8xKEbQJKKRUUmq3936WNu7ZY1WUbL2y9MCbZ6UVgA
     try {
       setError("")
 
-      // For demonstration purposes, we'll simulate signing
-      // In a real app, you would use crypto.subtle.sign
+      if (algorithm === "DSA") {
+        // DSA signing process
+        const newParams = { ...dsaParams }
 
-      // Simulate signing (this is just for demonstration)
-      const mockSignature = simulateSignature(message, algorithm)
-      setSignature(mockSignature)
+        // Step 1: Hash the message (simplified)
+        newParams.hash = simpleHash(message) % newParams.q
+
+        // Step 2: Calculate r = (g^k mod p) mod q
+        newParams.r = modPow(newParams.g, newParams.k, newParams.p) % newParams.q
+
+        // Step 3: Calculate s = k^(-1) * (hash + x*r) mod q
+        const kInv = modInverse(newParams.k, newParams.q)
+        newParams.s = (kInv * (newParams.hash + newParams.x * newParams.r)) % newParams.q
+
+        setDsaParams(newParams)
+        setSignature(`r = ${newParams.r}, s = ${newParams.s}`)
+        setDsaStep(1)
+      } else {
+        // For other algorithms, simulate signing
+        const mockSignature = simulateSignature(message, algorithm)
+        setSignature(mockSignature)
+      }
+
       setTamperedMessage(message)
       setVerificationResult(null)
     } catch (err) {
@@ -118,16 +164,74 @@ JMZzxdJYjT6wNmR8xKEbQJKKRUUmq3936WNu7ZY1WUbL2y9MCbZ6UVgA
     try {
       setError("")
 
-      // For demonstration purposes, we'll simulate verification
-      // In a real app, you would use crypto.subtle.verify
+      if (algorithm === "DSA") {
+        // DSA verification process
+        const hashToVerify = simpleHash(tamperedMessage) % dsaParams.q
 
-      // Simulate verification (this is just for demonstration)
-      const isValid = tamperedMessage === message
-      setVerificationResult(isValid)
+        // Calculate w = s^(-1) mod q
+        const w = modInverse(dsaParams.s, dsaParams.q)
+
+        // Calculate u1 = hash * w mod q
+        const u1 = (hashToVerify * w) % dsaParams.q
+
+        // Calculate u2 = r * w mod q
+        const u2 = (dsaParams.r * w) % dsaParams.q
+
+        // Calculate v = ((g^u1 * y^u2) mod p) mod q
+        const v =
+          ((modPow(dsaParams.g, u1, dsaParams.p) * modPow(dsaParams.y, u2, dsaParams.p)) % dsaParams.p) % dsaParams.q
+
+        // Signature is valid if v == r
+        const isValid = v === dsaParams.r
+        setVerificationResult(isValid)
+        setDsaStep(2)
+      } else {
+        // For other algorithms, simulate verification
+        const isValid = tamperedMessage === message
+        setVerificationResult(isValid)
+      }
     } catch (err) {
       setError(`Verification error: ${err.message}`)
       console.error(err)
     }
+  }
+
+  // Helper functions for DSA
+  const modPow = (base, exp, mod) => {
+    let result = 1
+    base = base % mod
+    while (exp > 0) {
+      if (exp % 2 === 1) {
+        result = (result * base) % mod
+      }
+      exp = Math.floor(exp / 2)
+      base = (base * base) % mod
+    }
+    return result
+  }
+
+  const modInverse = (a, m) => {
+    // Extended Euclidean Algorithm
+    const gcd = (a, b) =>
+      b === 0
+        ? [a, 1, 0]
+        : (() => {
+            const [g, x, y] = gcd(b, a % b)
+            return [g, y, x - Math.floor(a / b) * y]
+          })()
+
+    const [g, x] = gcd(a, m)
+    return g === 1 ? ((x % m) + m) % m : null
+  }
+
+  const simpleHash = (str) => {
+    let hash = 0
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i)
+      hash = (hash << 5) - hash + char
+      hash = hash & hash // Convert to 32-bit integer
+    }
+    return Math.abs(hash)
   }
 
   // Simulate signature (for demonstration purposes)
@@ -156,6 +260,14 @@ JMZzxdJYjT6wNmR8xKEbQJKKRUUmq3936WNu7ZY1WUbL2y9MCbZ6UVgA
     }
 
     return result
+  }
+
+  const nextDsaStep = () => {
+    if (dsaStep === 0) {
+      sign()
+    } else if (dsaStep === 1) {
+      verify()
+    }
   }
 
   return (
@@ -187,6 +299,7 @@ JMZzxdJYjT6wNmR8xKEbQJKKRUUmq3936WNu7ZY1WUbL2y9MCbZ6UVgA
                           <SelectItem value="RSA-PSS">RSA-PSS</SelectItem>
                           <SelectItem value="ECDSA">ECDSA (P-256)</SelectItem>
                           <SelectItem value="Ed25519">Ed25519</SelectItem>
+                          <SelectItem value="DSA">DSA</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -261,6 +374,10 @@ JMZzxdJYjT6wNmR8xKEbQJKKRUUmq3936WNu7ZY1WUbL2y9MCbZ6UVgA
                   </div>
                 </div>
 
+                {algorithm === "DSA" && (
+                  <DSAStepByStep params={dsaParams} step={dsaStep} message={message} onNextStep={nextDsaStep} />
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
                   <div className="space-y-2">
                     <Label htmlFor="publicKey">Public Key</Label>
@@ -295,6 +412,150 @@ JMZzxdJYjT6wNmR8xKEbQJKKRUUmq3936WNu7ZY1WUbL2y9MCbZ6UVgA
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+function DSAStepByStep({ params, step, message, onNextStep }) {
+  return (
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Calculator className="h-5 w-5" />
+          DSA Step-by-Step Process
+        </CardTitle>
+        <CardDescription>Follow the Digital Signature Algorithm step by step</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-6">
+          {/* Parameters */}
+          <div className="bg-blue-50 p-4 rounded-lg">
+            <h4 className="font-semibold text-blue-800 mb-2">DSA Parameters</h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div>
+                <span className="font-medium">p:</span> {params.p} (prime)
+              </div>
+              <div>
+                <span className="font-medium">q:</span> {params.q} (prime divisor)
+              </div>
+              <div>
+                <span className="font-medium">g:</span> {params.g} (generator)
+              </div>
+              <div>
+                <span className="font-medium">x:</span> {params.x} (private key)
+              </div>
+            </div>
+            <div className="mt-2 text-sm">
+              <span className="font-medium">y:</span> {params.y} (public key = g^x mod p)
+            </div>
+          </div>
+
+          {/* Step indicators */}
+          <div className="flex items-center justify-center space-x-4">
+            <div className={`flex items-center space-x-2 ${step >= 0 ? "text-blue-600" : "text-gray-400"}`}>
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                  step >= 0 ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-400"
+                }`}
+              >
+                1
+              </div>
+              <span>Setup</span>
+            </div>
+            <ArrowRight className="h-4 w-4 text-gray-400" />
+            <div className={`flex items-center space-x-2 ${step >= 1 ? "text-green-600" : "text-gray-400"}`}>
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                  step >= 1 ? "bg-green-100 text-green-600" : "bg-gray-100 text-gray-400"
+                }`}
+              >
+                2
+              </div>
+              <span>Sign</span>
+            </div>
+            <ArrowRight className="h-4 w-4 text-gray-400" />
+            <div className={`flex items-center space-x-2 ${step >= 2 ? "text-purple-600" : "text-gray-400"}`}>
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                  step >= 2 ? "bg-purple-100 text-purple-600" : "bg-gray-100 text-gray-400"
+                }`}
+              >
+                3
+              </div>
+              <span>Verify</span>
+            </div>
+          </div>
+
+          {/* Step content */}
+          {step === 0 && (
+            <div className="space-y-4">
+              <h4 className="font-semibold">Step 1: Setup and Key Generation</h4>
+              <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                <div className="text-sm">
+                  <div className="font-medium">1. Choose prime p = {params.p}</div>
+                  <div className="font-medium">2. Choose prime q = {params.q} such that q divides (p-1)</div>
+                  <div className="font-medium">3. Choose generator g = {params.g}</div>
+                  <div className="font-medium">4. Choose private key x = {params.x} (random, 0 &lt; x &lt; q)</div>
+                  <div className="font-medium">
+                    5. Compute public key y = g^x mod p = {params.g}^{params.x} mod {params.p} = {params.y}
+                  </div>
+                </div>
+              </div>
+              <Button onClick={onNextStep} className="w-full">
+                Proceed to Signing
+              </Button>
+            </div>
+          )}
+
+          {step === 1 && (
+            <div className="space-y-4">
+              <h4 className="font-semibold">Step 2: Signing Process</h4>
+              <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                <div className="text-sm">
+                  <div className="font-medium">Message: "{message}"</div>
+                  <div className="font-medium">1. Hash message: H(m) = {params.hash}</div>
+                  <div className="font-medium">2. Choose random k = {params.k} (0 &lt; k &lt; q)</div>
+                  <div className="font-medium">
+                    3. Calculate r = (g^k mod p) mod q = ({params.g}^{params.k} mod {params.p}) mod {params.q} ={" "}
+                    {params.r}
+                  </div>
+                  <div className="font-medium">4. Calculate s = k^(-1) × (H(m) + x×r) mod q = {params.s}</div>
+                  <div className="font-medium">
+                    5. Signature: (r, s) = ({params.r}, {params.s})
+                  </div>
+                </div>
+              </div>
+              <Button onClick={onNextStep} className="w-full">
+                Proceed to Verification
+              </Button>
+            </div>
+          )}
+
+          {step === 2 && (
+            <div className="space-y-4">
+              <h4 className="font-semibold">Step 3: Verification Process</h4>
+              <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                <div className="text-sm">
+                  <div className="font-medium">
+                    Given: signature (r, s) = ({params.r}, {params.s})
+                  </div>
+                  <div className="font-medium">1. Calculate w = s^(-1) mod q</div>
+                  <div className="font-medium">2. Calculate u1 = H(m) × w mod q</div>
+                  <div className="font-medium">3. Calculate u2 = r × w mod q</div>
+                  <div className="font-medium">4. Calculate v = ((g^u1 × y^u2) mod p) mod q</div>
+                  <div className="font-medium">5. Signature is valid if v = r</div>
+                </div>
+              </div>
+              <div className="bg-green-50 p-4 rounded-lg">
+                <div className="text-green-800 font-medium">
+                  ✓ Verification complete! The signature mathematics ensure that only someone with the private key x
+                  could have created a signature that passes verification.
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -353,9 +614,22 @@ function SignatureMathematics() {
             <div className="font-mono">S = (r + H(R, A, M) × s) mod ℓ</div>
             <div className="font-mono">σ = (R, S)</div>
             <div className="text-xs mt-2">
-              Where B = basese point, A = public key, M = message, s = private scalar, ℓ = curve order
+              Where B = base point, A = public key, M = message, s = private scalar, ℓ = curve order
             </div>
             <div className="text-xs">Security: Based on discrete logarithm problem on Edwards curves</div>
+          </div>
+        </div>
+
+        <div className="bg-yellow-50 p-4 rounded-md">
+          <h4 className="font-semibold text-yellow-800">DSA (Digital Signature Algorithm)</h4>
+          <div className="text-sm text-yellow-700 mt-2 space-y-2">
+            <div className="font-mono">r = (g^k mod p) mod q</div>
+            <div className="font-mono">s = k⁻¹(H(m) + x × r) mod q</div>
+            <div className="font-mono">σ = (r, s)</div>
+            <div className="text-xs mt-2">
+              Where p, q = primes (q divides p-1), g = generator, k = random nonce, x = private key
+            </div>
+            <div className="text-xs">Security: Based on discrete logarithm problem in finite fields</div>
           </div>
         </div>
       </div>
@@ -447,6 +721,13 @@ function SignatureAlgorithms() {
                 <td className="border border-gray-300 p-2">Edwards curve DL</td>
                 <td className="border border-gray-300 p-2">Very fast, constant time</td>
               </tr>
+              <tr>
+                <td className="border border-gray-300 p-2 font-medium">DSA</td>
+                <td className="border border-gray-300 p-2">1024-3072 bits</td>
+                <td className="border border-gray-300 p-2">40-64 bytes</td>
+                <td className="border border-gray-300 p-2">Discrete logarithm</td>
+                <td className="border border-gray-300 p-2">Moderate speed</td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -518,6 +799,37 @@ function SignatureAlgorithms() {
               <div className="font-mono ml-4">4. Signature: (R, S)</div>
             </div>
           </div>
+
+          <div className="bg-yellow-50 p-4 rounded-md">
+            <h4 className="font-semibold text-yellow-800">DSA (Digital Signature Algorithm)</h4>
+            <div className="text-sm text-yellow-700 mt-2 space-y-2">
+              <div>
+                <strong>Key Generation:</strong>
+              </div>
+              <div className="font-mono ml-4">1. Choose prime p (1024-3072 bits)</div>
+              <div className="font-mono ml-4">2. Choose prime q (160-256 bits) such that q | (p-1)</div>
+              <div className="font-mono ml-4">3. Choose generator g of order q in Z*p</div>
+              <div className="font-mono ml-4">4. Choose private key x ∈ [1, q-1]</div>
+              <div className="font-mono ml-4">5. Compute public key y = g^x mod p</div>
+
+              <div className="mt-3">
+                <strong>Signing Process:</strong>
+              </div>
+              <div className="font-mono ml-4">1. Choose random k ∈ [1, q-1]</div>
+              <div className="font-mono ml-4">2. r = (g^k mod p) mod q</div>
+              <div className="font-mono ml-4">3. s = k⁻¹(H(m) + x × r) mod q</div>
+              <div className="font-mono ml-4">4. Signature: (r, s)</div>
+
+              <div className="mt-3">
+                <strong>Verification Process:</strong>
+              </div>
+              <div className="font-mono ml-4">1. w = s⁻¹ mod q</div>
+              <div className="font-mono ml-4">2. u1 = H(m) × w mod q</div>
+              <div className="font-mono ml-4">3. u2 = r × w mod q</div>
+              <div className="font-mono ml-4">4. v = ((g^u1 × y^u2) mod p) mod q</div>
+              <div className="font-mono ml-4">5. Valid if v = r</div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -528,7 +840,7 @@ function SignatureAlgorithms() {
             <h4 className="font-semibold text-red-800">Common Vulnerabilities</h4>
             <div className="text-sm text-red-700 mt-2 space-y-1">
               <div>
-                • <strong>Nonce reuse:</strong> Using same k in ECDSA reveals private key
+                • <strong>Nonce reuse:</strong> Using same k in ECDSA/DSA reveals private key
               </div>
               <div>
                 • <strong>Weak randomness:</strong> Predictable k values compromise security
@@ -545,7 +857,7 @@ function SignatureAlgorithms() {
             <h4 className="font-semibold text-green-800">Best Practices</h4>
             <div className="text-sm text-green-700 mt-2 space-y-1">
               <div>
-                • <strong>Use deterministic nonces:</strong> RFC 6979 for ECDSA
+                • <strong>Use deterministic nonces:</strong> RFC 6979 for ECDSA/DSA
               </div>
               <div>
                 • <strong>Constant-time implementations:</strong> Prevent timing attacks

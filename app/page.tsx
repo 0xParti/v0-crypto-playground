@@ -3,7 +3,16 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { ChevronRightIcon, BookOpenIcon, KeyIcon, ShieldIcon, BrainIcon } from "lucide-react"
+import {
+  ChevronRightIcon,
+  BookOpenIcon,
+  KeyIcon,
+  ShieldIcon,
+  BrainIcon,
+  AlertTriangle,
+  Twitter,
+  Github,
+} from "lucide-react"
 
 import SymmetricEncryption from "@/components/symmetric-encryption"
 import AsymmetricEncryption from "@/components/asymmetric-encryption"
@@ -79,6 +88,47 @@ export default function Home() {
           <p className="text-gray-600 mt-1">Learn and experiment with cryptographic algorithms in real-time</p>
         </div>
       </header>
+
+      {/* Disclaimer and Author Info */}
+      <div className="max-w-7xl mx-auto px-6 py-4 bg-yellow-50 border-b border-yellow-200">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-600" />
+              <span className="font-semibold text-yellow-800">Educational Purpose Only</span>
+            </div>
+            <p className="text-sm text-yellow-700">
+              This cryptography playground is designed for educational purposes only. The implementations shown here are
+              simplified for learning and should never be used in real cryptographic applications or production systems.
+            </p>
+          </div>
+          <div className="flex flex-col items-end gap-2">
+            <div className="text-sm text-gray-600">
+              Created by <span className="font-semibold">Parti</span>
+            </div>
+            <div className="flex gap-3">
+              <a
+                href="https://x.com/0xParticle"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm"
+              >
+                <Twitter className="h-4 w-4" />
+                @0xParticle
+              </a>
+              <a
+                href="https://github.com/0xParti"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-gray-700 hover:text-gray-900 text-sm"
+              >
+                <Github className="h-4 w-4" />
+                0xParti
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div className="max-w-7xl mx-auto flex">
         {/* Sidebar */}
